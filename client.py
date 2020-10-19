@@ -4,9 +4,11 @@ import argparse
 HOST = '127.0.0.1'
 PORT = 8000
 parser = argparse.ArgumentParser()
-parser.add_argument("port", nargs='?', default=PORT)
+parser.add_argument("-host","--host", nargs='?', default=HOST)
+parser.add_argument("-port","--port", nargs='?', default=PORT)
 args = parser.parse_args()
 PORT = int(args.port)
+HOST = args.host
 
 addr = (HOST,PORT)
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

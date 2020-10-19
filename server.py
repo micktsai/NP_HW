@@ -7,9 +7,11 @@ import time
 HOST = '127.0.0.1'
 PORT = 8000
 parser = argparse.ArgumentParser()
-parser.add_argument("port", nargs='?', default=PORT)
+parser.add_argument("-host","--host", nargs='?', default=HOST)
+parser.add_argument("-port","--port", nargs='?', default=PORT)
 args = parser.parse_args()
 PORT = int(args.port)
+HOST = args.host
 clients = []
 
 class client():
@@ -143,6 +145,7 @@ def UDP(number):
     while True:
         cmsg,addr = _server.recvfrom(1024)
         cmsg = cmsg.decode().split(' ')
+        print('Client message is:', cmsg)
         smsg = UDP_react(cmsg,number)
         _server.sendto(smsg.encode(),addr)
 def listen(connect,number):
