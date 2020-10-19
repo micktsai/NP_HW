@@ -2,6 +2,7 @@ import socket
 import argparse
 import random
 import threading
+import time
 
 HOST = '127.0.0.1'
 PORT = 8000
@@ -17,9 +18,12 @@ class client():
         self.password = password
         self.login = login
         self.email = email
+        self.number = 0
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((HOST, PORT))
+_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+_server.bind((HOST, PORT))
 server.listen(10)
 
 def generate():
@@ -35,14 +39,12 @@ def generate():
     i = client("ichiro","123","ichiro@aaa.com")
     j = client("john","123","john@aaa.com")
     clients = [a,b,c,d,e,f,g,h,i,j]
-now = None
-usr = []
+
 now = []
 #login = False
 
-def react(cmsg,login,number):
+def TCP_react(cmsg,login,number):
     global usr,now,clients
-    method = "TCP"
     #login reaction
     if cmsg[0] == "login" and len(cmsg) == 3:
         if login == False:
@@ -53,7 +55,6 @@ def react(cmsg,login,number):
                         item.login = True
                         #login = True
                         now[number] = item
-                        usr.append(item)
                         smsg = "Welcome, " + item.name+"."
                     else:
                         smsg = "Login failed."
@@ -67,9 +68,30 @@ def react(cmsg,login,number):
             smsg = "Login failed."
     elif cmsg[0] == "login" and len(cmsg) < 3:
         smsg = "Usage: login <username> <password>"
+    #logout
+    elif cmsg[0] == "logout" and login == True:
+        smsg = "Bye, " + now[number].name +"."
+        now[number] .login = False
+        usr.remove(now[number] )
+        now[number]  = None
+        login = False
+    elif cmsg[0] == "logout" and login == False:
+        smsg = "Please login first."
+    #list
+    elif cmsg[0] == "list-user":
+        smsg = "Name            Email"
+        for item in clients:
+            smsg += "\n"+item.name+"     "+item.email
+    #exit 
+    elif cmsg[0] == "exit":
+        smsg = "exit"
+    else:
+        smsg = 'wrong method'
+    return smsg
+
+def UDP_react(cmsg,number):
     #rigister
-    elif cmsg[0] == "register" and len(cmsg) ==4:
-        method = "UDP"
+    if cmsg[0] == "register" and len(cmsg) ==4:
         for item in clients:
             exist = False
             if cmsg[1] == item.name:
@@ -82,70 +104,59 @@ def react(cmsg,login,number):
             smsg = "Register successfully."
     elif cmsg[0] == "register" and len(cmsg) < 4:
         smsg = "Usage: register <username> <email> <password>"
-        method = "UDP"
-    #logout
-    elif cmsg[0] == "logout" and login == True:
-        smsg = "Bye, " + now.name +"."
-        now[number] .login = False
-        usr.remove(now[number] )
-        now[number]  = None
-        login = False
-    elif cmsg[0] == "logout" and login == False:
-        smsg = "Please login first."
     #whoami
-    elif cmsg[0] == "whoami" and login ==True:
-        method = "UDP"
-        smsg = now[number] .name
-    elif cmsg[0] == "whoami" and login == False:
-        method = "UDP"
-        smsg = "Please login first."
-    #list
-    elif cmsg[0] == "list-user":
-        smsg = "Name            Email"
-        for item in usr:
-            smsg += "\n"+item.name+"     "+item.email
-    #exit 
-    elif cmsg[0] == "exit":
-        smsg = "exit"
-    else:
-        smsg = 'wrong method'
-    return smsg,method
+    elif cmsg[0] == "whoami" :
+        if cmsg[-1] == str(0):
+            smsg = "Please login first."
+        else:
+            for item in clients:
+                if str(item.number) == cmsg[-1]:
+                    smsg = item .name
+                    break
+    return smsg
 
-def listen(connect,number):
+def TCP(connect,number):
+    rn = 0
     login = False
     while True:
-            #try:
-            cmsg = str(connect.recv(1024), encoding='utf-8').split(' ')
-            """
-            except:
-                cmsg,(udp_host,udp_addr) = str(server.recvfrom(1024), encoding='utf-8').split(' ')
-                print("UDP")
-            """
-            if not cmsg:
-                pass
-            else:
-                print('Client message is:', cmsg)
-                smsg ,method= react(cmsg,login,number)
-            if smsg.split(' ')[0] == "Welcome,":
-                login = True
-            elif smsg.split(' ')[0] == "Bye,":
-                login = False
-
-            if smsg == "exit":
-                connect.send(smsg.encode())
-                break
-            elif method == "UDP":
-                connect.send(smsg.encode())
-            else:
-                connect.send(smsg.encode())
-            print(login)
-
+        cmsg = str(connect.recv(1024), encoding='utf-8').split(' ')
+        print('Client message is:', cmsg)
+        smsg = TCP_react(cmsg,login,number)
+        if smsg.split(' ')[0] == "Welcome,":
+            login = True
+            rn = random.randrange(1,1000)
+            for item in clients:
+                if item.login== True:
+                    item.number = rn
+            connect.send(smsg.encode())
+            time.sleep(0.1)
+            connect.send(str(rn).encode())
+        elif smsg.split(' ')[0] == "Bye,":
+            login = False
+            connect.send(smsg.encode())
+        elif smsg == "exit":
+            connect.send(smsg.encode())
+            break
+        else:
+            connect.send(smsg.encode())
+def UDP(number):
+    while True:
+        cmsg,addr = _server.recvfrom(1024)
+        cmsg = cmsg.decode().split(' ')
+        smsg = UDP_react(cmsg,number)
+        _server.sendto(smsg.encode(),addr)
+def listen(connect,number):
+    login = False
+    TCP_thread = threading.Thread(target=TCP,args=(connect,number,))
+    TCP_thread.start()
 def main():
     global now
     number = 0
+    UDP_thread = threading.Thread(target=UDP,args=(number,))
+    UDP_thread.start()
     while True:
         (connect, addr) = server.accept()
-        #print(connect)
+        print(addr)
         _thread = threading.Thread(target=listen,args=(connect,number,))
         number +=1
         now.append(None)
