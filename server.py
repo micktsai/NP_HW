@@ -127,9 +127,7 @@ def TCP(connect,number):
         if smsg.split(' ')[0] == "Welcome,":
             login = True
             rn = random.randrange(1,1000)
-            for item in clients:
-                if item.login== True:
-                    item.number = rn
+            now[number].number = rn
             connect.send(smsg.encode())
             time.sleep(0.1)
             connect.send(str(rn).encode())
